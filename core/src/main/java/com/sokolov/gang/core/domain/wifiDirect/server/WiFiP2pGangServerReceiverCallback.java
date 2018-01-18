@@ -70,7 +70,7 @@ public class WiFiP2pGangServerReceiverCallback implements WiFiP2pGangServerRecei
             for (WifiP2pDevice wifiP2pDevice : group.getClientList()) {
                 if (!devicesRep.contains(wifiP2pDevice.deviceAddress)) {
                     try {
-                        IDevice device =
+                        final IDevice device =
                                 new Device(
                                         wifiP2pDevice.deviceAddress,
                                         new GangSocketConnectionWithClient()
@@ -80,11 +80,15 @@ public class WiFiP2pGangServerReceiverCallback implements WiFiP2pGangServerRecei
                                         device.sockets().get(SERVER_PING_PONG_PORT),
                                         5000,
                                         MESSAGE_PING,
-                                        e ->
+                                        new PingPonger.IPingPongerCallback() {
+                                            @Override
+                                            public void onException(Exception e) {
                                                 new SafeClosableDevice(
                                                         devicesRep.delete(
                                                                 device.address()))
-                                                        .closeConnections()));
+                                                        .closeConnections();
+                                            }
+                                        }));
 
                         devicesRep.save(device);
                     } catch (IOException e) {

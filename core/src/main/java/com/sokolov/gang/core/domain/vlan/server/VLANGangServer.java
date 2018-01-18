@@ -9,8 +9,8 @@ import com.sokolov.gang.core.domain.vlan.messages.ConnectMessage;
 import com.sokolov.gang.core.domain.vlan.messages.DatagramPacketMessage;
 import com.sokolov.gang.core.domain.vlan.messages.FromClientMessage;
 import com.sokolov.gang.core.entity.Device;
-import com.sokolov.gang.core.entity.IGangServer;
 import com.sokolov.gang.core.entity.IDevice;
+import com.sokolov.gang.core.entity.IGangServer;
 import com.sokolov.gang.core.entity.SafeClosableDevice;
 import com.sokolov.gang.core.entity.State;
 
@@ -89,62 +89,69 @@ public class VLANGangServer implements IGangServer {
             state = State.DISCOVERING;
 
             listeningWorker =
-                    new Thread(() -> {
-                        try {
-                            while (!Thread.interrupted()) {
-                                try {
-                                    DatagramPacket packet = new DatagramPacket(new byte[buffLength], buffLength);
+                    new Thread(
+                            new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        while (!Thread.interrupted()) {
+                                            try {
+                                                DatagramPacket packet = new DatagramPacket(new byte[buffLength], buffLength);
 
-                                    inputDatagramSocket.receive(packet);
+                                                inputDatagramSocket.receive(packet);
 
-                                    if (state == State.DISCOVERING) {
-                                        FromClientMessage fromClientMessage =
-                                                new FromClientMessage(
-                                                        new DatagramPacketMessage(packet));
+                                                if (state == State.DISCOVERING) {
+                                                    FromClientMessage fromClientMessage =
+                                                            new FromClientMessage(
+                                                                    new DatagramPacketMessage(packet));
 
-                                        if (fromClientMessage.networkId().equals(networkId)) {
+                                                    if (fromClientMessage.networkId().equals(networkId)) {
 
-                                            if (!devicesRep.contains(fromClientMessage.hostAddress())) {
-                                                outputDatagramSocket.send(
-                                                        new ConnectMessage(
-                                                                fromClientMessage.hostAddress(),
-                                                                new InetSocketAddress(
-                                                                        broadcastAddress,
-                                                                        outputBroadcastPort))
-                                                                .toDatagramPacket());
-                                                try {
-                                                    IDevice device =
-                                                            new Device(
-                                                                    fromClientMessage.hostAddress(),
-                                                                    new GangSocketConnectionWithClient()
-                                                                            .establish());
+                                                        if (!devicesRep.contains(fromClientMessage.hostAddress())) {
+                                                            outputDatagramSocket.send(
+                                                                    new ConnectMessage(
+                                                                            fromClientMessage.hostAddress(),
+                                                                            new InetSocketAddress(
+                                                                                    broadcastAddress,
+                                                                                    outputBroadcastPort))
+                                                                            .toDatagramPacket());
+                                                            try {
+                                                                final IDevice device =
+                                                                        new Device(
+                                                                                fromClientMessage.hostAddress(),
+                                                                                new GangSocketConnectionWithClient()
+                                                                                        .establish());
 
-                                                    executor.execute(
-                                                            new PingPonger(
-                                                                    device.sockets().get(SERVER_PING_PONG_PORT),
-                                                                    5000,
-                                                                    MESSAGE_PING,
-                                                                    e ->
-                                                                            new SafeClosableDevice(
-                                                                                    devicesRep.delete(
-                                                                                            device.address()))
-                                                                                    .closeConnections()));
-                                                    devicesRep.save(device);
-                                                } catch (IOException e) {
-                                                    Log.e(TAG, "processConnectionChangedAction: ", e);
+                                                                executor.execute(
+                                                                        new PingPonger(
+                                                                                device.sockets().get(SERVER_PING_PONG_PORT),
+                                                                                5000,
+                                                                                MESSAGE_PING,
+                                                                                new PingPonger.IPingPongerCallback() {
+                                                                                    @Override
+                                                                                    public void onException(Exception e) {
+                                                                                        new SafeClosableDevice(
+                                                                                                devicesRep.delete(
+                                                                                                        device.address()))
+                                                                                                .closeConnections();
+                                                                                    }
+                                                                                }));
+                                                                devicesRep.save(device);
+                                                            } catch (IOException e) {
+                                                                Log.e(TAG, "processConnectionChangedAction: ", e);
+                                                            }
+                                                        }
+                                                    }
                                                 }
-
+                                            } catch (SocketTimeoutException ignored) {
+                                                Log.d(TAG, "listeningWorker.run: SocketTimeoutException");
                                             }
                                         }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "startListening.run: ", e);
                                     }
-                                } catch (SocketTimeoutException ignored) {
-                                    Log.d(TAG, "listeningWorker.run: SocketTimeoutException");
                                 }
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "startListening.run: ", e);
-                        }
-                    });
+                            });
 
             listeningWorker.start();
 

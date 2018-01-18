@@ -3,6 +3,7 @@ package com.sokolov.gang.core.domain.wifiDirect.client;
 import android.content.Context;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
+import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest;
 import android.util.Log;
@@ -19,7 +20,9 @@ import com.sokolov.gang.core.entity.IDevice;
 import com.sokolov.gang.core.entity.SafeClosableDevice;
 import com.sokolov.gang.core.entity.State;
 
+import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,7 +47,7 @@ public class WiFiP2pGangClient implements IGangClient {
     private IDevice server;
     private State state;
 
-    public WiFiP2pGangClient(Context context, String networkId, IConnectionListener onConnectionRequestListener) {
+    public WiFiP2pGangClient(Context context, String networkId, final IConnectionListener onConnectionRequestListener) {
         this.context = context;
         manager = (WifiP2pManager) this.context.getSystemService(Context.WIFI_P2P_SERVICE);
         channel = manager.initialize(this.context, this.context.getMainLooper(), new ChannelListener());
@@ -64,10 +67,13 @@ public class WiFiP2pGangClient implements IGangClient {
                                         new LoggableWiFiP2pGangClientReceiverCallback(
                                                 new WiFiP2pGangClientReceiverCallback(
                                                         this,
-                                                        device -> {
-                                                            this.server = device;
-                                                            setIsConnected();
-                                                            onConnectionRequestListener.onConnected(device);
+                                                        new IConnectionListener() {
+                                                            @Override
+                                                            public void onConnected(IDevice device) throws IOException {
+                                                                server = device;
+                                                                setIsConnected();
+                                                                onConnectionRequestListener.onConnected(device);
+                                                            }
                                                         },
                                                         executor))),
                                 executor));
@@ -132,12 +138,15 @@ public class WiFiP2pGangClient implements IGangClient {
                 new AsyncDnsSdTxtRecordListener(
                         new DisposableDnsSdTxtRecordListener(
                                 new LoggableDnsSdTxtRecordListener(
-                                        (fullDomainName, txtRecordMap, srcDevice) -> {
-                                            synchronized (WiFiP2pGangClient.this) {
-                                                if (state == DISCOVERING) {
-                                                    stopDiscover();
-                                                    state = CONNECTING;
-                                                    connect(srcDevice.deviceAddress);
+                                        new WifiP2pManager.DnsSdTxtRecordListener() {
+                                            @Override
+                                            public void onDnsSdTxtRecordAvailable(String fullDomainName, Map<String, String> txtRecordMap, WifiP2pDevice srcDevice) {
+                                                synchronized (WiFiP2pGangClient.this) {
+                                                    if (state == DISCOVERING) {
+                                                        stopDiscover();
+                                                        state = CONNECTING;
+                                                        connect(srcDevice.deviceAddress);
+                                                    }
                                                 }
                                             }
                                         })),
@@ -153,21 +162,26 @@ public class WiFiP2pGangClient implements IGangClient {
                             public void onSuccess() {
                                 state = DISCOVERING;
                                 futures.add(
-                                        executor.submit(() -> {
-                                            try {
-                                                synchronized (this) {
-                                                    while (state == DISCOVERING) {
-                                                        wait(2000);
-                                                        manager.discoverServices(
-                                                                channel,
-                                                                new LoggableWiFiP2pActionListener(
-                                                                        "discoverServices"));
+                                        executor.submit(
+                                                new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        try {
+                                                            synchronized (this) {
+                                                                while (state == DISCOVERING) {
+                                                                    wait(2000);
+                                                                    manager.discoverServices(
+                                                                            channel,
+                                                                            new LoggableWiFiP2pActionListener(
+                                                                                    "discoverServices"));
+                                                                }
+                                                            }
+                                                        } catch (InterruptedException e) {
+                                                            Log.e(TAG, "addServiceRequest: ", e);
+                                                        }
                                                     }
                                                 }
-                                            } catch (InterruptedException e) {
-                                                Log.e(TAG, "addServiceRequest: ", e);
-                                            }
-                                        }));
+                                        ));
                             }
                         },
                         "addServiceRequest"));
@@ -192,18 +206,23 @@ public class WiFiP2pGangClient implements IGangClient {
                             @Override
                             public void onSuccess() {
                                 futures.add(
-                                        executor.submit(() -> {
-                                            try {
-                                                synchronized (this) {
-                                                    wait(10000);
-                                                    if (state == CONNECTING) {
-                                                        startDiscovering();
+                                        executor.submit(
+                                                new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        try {
+                                                            synchronized (this) {
+                                                                wait(10000);
+                                                                if (state == CONNECTING) {
+                                                                    startDiscovering();
+                                                                }
+                                                            }
+                                                        } catch (InterruptedException e) {
+                                                            Log.e(TAG, "run: ", e);
+                                                        }
                                                     }
                                                 }
-                                            } catch (InterruptedException e) {
-                                                Log.e(TAG, "run: ", e);
-                                            }
-                                        }));
+                                        ));
                             }
 
                             @Override

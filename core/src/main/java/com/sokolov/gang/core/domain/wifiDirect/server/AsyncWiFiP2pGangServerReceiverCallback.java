@@ -17,26 +17,61 @@ public class AsyncWiFiP2pGangServerReceiverCallback implements WiFiP2pGangServer
 
     @Override
     public void processConnectionChangedAction(final WifiP2pGroup group) {
-        executorService.execute(() -> origin.processConnectionChangedAction(group));
+        executorService.execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        origin.processConnectionChangedAction(group);
+                    }
+                }
+        );
     }
 
     @Override
     public void processThisDeviceChangedAction(final WifiP2pDevice device) {
-        executorService.execute(() -> origin.processThisDeviceChangedAction(device));
+        executorService.execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        origin.processThisDeviceChangedAction(device);
+                    }
+                }
+        );
     }
 
     @Override
     public void processPeersChangedAction(final WifiP2pDeviceList deviceList) {
-        executorService.execute(() -> origin.processPeersChangedAction(deviceList));
+        executorService.execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        origin.processPeersChangedAction(deviceList);
+                    }
+                }
+        );
     }
 
     @Override
     public void processStateChangedAction(final int state) {
-        executorService.execute(() -> origin.processStateChangedAction(state));
+        executorService.execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        origin.processStateChangedAction(state);
+                    }
+                }
+        );
     }
 
     @Override
     public void processDiscoveryChangedAction(final int state) {
-        executorService.execute(() -> origin.processDiscoveryChangedAction(state));
+        executorService.execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        origin.processDiscoveryChangedAction(state);
+                    }
+                }
+        );
     }
 }

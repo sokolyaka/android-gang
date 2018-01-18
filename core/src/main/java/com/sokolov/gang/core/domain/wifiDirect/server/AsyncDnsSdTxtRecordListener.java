@@ -16,8 +16,14 @@ public class AsyncDnsSdTxtRecordListener implements WifiP2pManager.DnsSdTxtRecor
     }
 
     @Override
-    public void onDnsSdTxtRecordAvailable(String fullDomainName, Map<String, String> txtRecordMap, WifiP2pDevice srcDevice) {
-        executorService.execute(() ->
-                origin.onDnsSdTxtRecordAvailable(fullDomainName, txtRecordMap, srcDevice));
+    public void onDnsSdTxtRecordAvailable(final String fullDomainName, final Map<String, String> txtRecordMap, final WifiP2pDevice srcDevice) {
+        executorService.execute(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        origin.onDnsSdTxtRecordAvailable(fullDomainName, txtRecordMap, srcDevice);
+                    }
+                }
+        );
     }
 }

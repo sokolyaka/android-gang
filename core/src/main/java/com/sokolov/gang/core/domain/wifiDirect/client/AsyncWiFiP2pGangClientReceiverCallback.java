@@ -18,16 +18,37 @@ public class AsyncWiFiP2pGangClientReceiverCallback implements WiFiP2pGangClient
 
     @Override
     public void processConnectionChangedAction(final NetworkInfo networkInfo, final WifiP2pInfo wifiP2pInfo, final WifiP2pGroup group) {
-        executorService.execute(() -> origin.processConnectionChangedAction(networkInfo, wifiP2pInfo, group));
+        executorService
+                .execute(
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                origin.processConnectionChangedAction(networkInfo, wifiP2pInfo, group);
+                            }
+                        });
     }
 
     @Override
     public void processThisDeviceChangedAction(final WifiP2pDevice device) {
-        executorService.execute(() -> origin.processThisDeviceChangedAction(device));
+        executorService
+                .execute(
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                origin.processThisDeviceChangedAction(device);
+                            }
+                        });
     }
 
     @Override
     public void processStateChangedAction(final int state) {
-        executorService.execute(() -> origin.processStateChangedAction(state));
+        executorService
+                .execute(
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                origin.processStateChangedAction(state);
+                            }
+                        });
     }
 }
