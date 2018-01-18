@@ -237,6 +237,7 @@ public class WiFiP2PGangServer implements IWiFiP2pGangServer {
         localService = null;
         manager.cancelConnect(channel, new LoggableWiFiP2pActionListener("cancelConnect"));
         clearLocalServices();
+        clearManagerCallbacks();
         unregisterReceiver();
         executor.shutdown();
         for (IDevice device : devicesRep.getAll()) {
